@@ -13,8 +13,23 @@ AquaSweep는 철갑상어 양식장을 NVIDIA Isaac Sim 위에 재현하고, ROS
 - **벽 청소 코봇** (7대, 수조당 1대) — 수조 둘레 원형 레일을 따라 벽면을 닦는 협동로봇
 - **갠트리 로봇** (1대, 건물 공용) — 천장에서 내려와 죽은 물고기를 수거하는 크레인
 
-Isaac Sim이 물리·물·카메라를 시뮬레이션하고, ROS 2가 이 로봇들을 동시에 제어합니다.물·물리·카메라를 시뮬레이션하고, ROS 2로 **수조 7개의 로봇들을
-동시에** 제어합니다.
+Isaac Sim이 물리·수중 환경·카메라를 시뮬레이션하고, ROS 2가 7개 수조의 로봇들을 동시에 제어합니다.
+
+## 담당 역할 및 주요 기여
+
+> 팀 프로젝트이며, 아래는 제가 직접 담당하거나 구현한 주요 범위입니다.
+
+- Isaac Sim의 PhysX GPU Particle System을 활용해 수조 이물질 생성 및 물리 시뮬레이션 초기 구조를 구현하고, GPU Dynamics·충돌 Offset 조정을 통해 바닥 관통 등 물리 불안정 문제를 개선했습니다.
+- Top-view Camera 기반 비전 파이프라인을 개발하고, Isaac Sim Replicator 기반 synthetic dataset을 활용해 YOLO OBB 모델을 재학습하여 신규 가중치를 최종 perception pipeline에 적용했습니다.
+- 물고기의 프레임 간 중심점 이동 거리를 누적하는 `ActivityFishStatusClassifier`를 구현하여, 활동량을 기준으로 철갑상어의 정상·의심 상태를 판별하는 로직을 개발했습니다.
+- Top Camera의 검출 결과와 수조 상태를 기존 ROS 2 인터페이스(`/pool_N/status`, `/pool_N/top_img_det`)에 맞춰 연동하여 대시보드에서 비전 결과를 모니터링할 수 있도록 구현했습니다.
+
+### 추가 Vision 실험
+
+- 고정 학습 클래스에 대한 의존도를 낮추기 위해 **YOLO-World + Ollama VLM** 기반 2단계 Zero-shot 인지 파이프라인을 별도로 구현·튜닝했습니다. 텍스트 프롬프트 기반으로 객체 후보를 탐지하고 VLM으로 철갑상어와 비대상 객체를 재검증하는 확장 구조를 실험했으며, Isaac Sim과 동시 구동 시 연산 부담을 고려해 최종 시연에는 적용하지 않고 후속 Challenge로 남겼습니다.
+- 대안 perception 구조로 **SAM2 기반 Zero-shot Segmentation**과 **DINOv2 기반 visual feature extraction** 모듈도 구현·검토했으며, 최종 시연에서는 YOLO OBB와 활동량 기반 상태 판별 구조를 사용했습니다.
+
+**Technical Deep Dive:** [Notion](https://capable-moss-bbd.notion.site/Technical-Deep-Dive-3-3e046f508ab380d09f57e695e7e88f79?pvs=74)
 
 ---
 
@@ -36,7 +51,7 @@ Isaac Sim이 물리·물·카메라를 시뮬레이션하고, ROS 2가 이 로�
 일단 한번 돌려보고 싶다면, 이 세 줄이면 됩니다.
 
 ```bash
-git clone https://github.com/yevettee/AquaSweep.git ~/AquaSweep
+git clone https://github.com/sunga4017/AquaSweep.git ~/AquaSweep
 cd ~/AquaSweep/water_ws && colcon build && source install/setup.bash
 ros2 launch aqua_hippo aqua_hippo.launch.py   # Isaac Sim을 켠 뒤 실행
 ```
@@ -47,8 +62,6 @@ ros2 launch aqua_hippo aqua_hippo.launch.py   # Isaac Sim을 켠 뒤 실행
 ---
 
 ## ✨ 주요 기능
-
-## 주요 기능
 
 - **양식장 환경 재현** — 40 m × 30 m 건물 안에 직경 8 m 원통형 수조 7개를 배치하고, 수조마다
   철갑상어(5~7마리)와 바닥 이물질 파티클을 생성합니다.
@@ -81,6 +94,7 @@ ros2 launch aqua_hippo aqua_hippo.launch.py   # Isaac Sim을 켠 뒤 실행
   (`aqua_dashboard`)
 
 ---
+
 ## 🏗️ 시스템 설계 & 동작 흐름
 
 ### 전체 구성
@@ -159,18 +173,6 @@ flowchart TD
 | `aqua_detection` | `fish_detection_node` | YOLO OBB 물고기 탐지 + OpenCV 이물질, 수조 상태 발행 |
 | `aqua_dashboard` | `dashboard_node`, `dashboard_gui` | 상태 모니터링 / PyQt5 GUI |
 | `aqua_hippo` | (launch 전용) | 전체 bringup 런치 |
-
-
-**ROS 2 패키지** (`water_ws/src/`) — 로봇을 인지·계획·제어하는 쪽이에요.
-
-| 패키지 | 노드 / 진입점 | 하는 일 |
-|---|---|---|
-| `aqua_interfaces` | (메시지/서비스/액션 정의) | 모든 통신 규격의 단일 출처 |
-| `aqua_controller` | `controller_node` ×7 | 수조별 Action 서버, Isaac 모션 서비스 중계, 로봇 상태 발행 |
-| `aqua_planner` | `planner_node` | 수조 상태를 보고 청소할 곳 선정, 벽·바닥 청소 지휘 |
-| `aqua_detection` | `fish_detection_node` | YOLO OBB 물고기 탐지 + OpenCV 이물질, 수조 상태 발행 |
-| `aqua_dashboard` | `dashboard_node`, `dashboard_gui` | 상태 모니터링 / PyQt5 GUI |
-| `aqua_hippo` | (launch 전용) | 전체를 한 번에 켜는 bringup 런치 |
 
 **ROS 2 통신 규격** (`aqua_interfaces`)
 
@@ -273,7 +275,7 @@ pip install -r requirements.txt
 ### 1단계 · ROS 2 워크스페이스 빌드 (Python 3.10)
 
 ```bash
-git clone https://github.com/yevettee/AquaSweep.git ~/AquaSweep
+git clone https://github.com/sunga4017/AquaSweep.git ~/AquaSweep
 cd ~/AquaSweep/water_ws
 colcon build
 source install/setup.bash
@@ -355,7 +357,8 @@ AquaSweep/                            # Git 저장소 루트 (git clone 시 생�
 │   ├── rail_robot_ext/               #   M1013 벽청소 코봇
 │   ├── gantry_robot_ext/             #   천장 갠트리 (물고기 수거)
 │   ├── debris_env_ext/               #   이물질 파티클
-│   ├── top_cam_ext/ , under_cam_ext/ #   카메라 ROS 2 발행
+│   ├── top_cam_ext/                  #   Top Camera ROS 2 발행
+│   ├── under_cam_ext/                #   Under Camera ROS 2 발행
 │   └── common/                       #   공유 유틸 (rclpy 환경, 브리지)
 │
 ├── water_ws/
@@ -374,7 +377,6 @@ AquaSweep/                            # Git 저장소 루트 (git clone 시 생�
 ├── requirements.txt                  # pip 의존성
 └── README.md
 ```
-
 
 ---
 
