@@ -27,7 +27,7 @@ Isaac Sim이 물리·수중 환경·카메라를 시뮬레이션하고, ROS 2가
 ### 추가 Vision 실험
 
 - 고정 학습 클래스에 대한 의존도를 낮추기 위해 **YOLO-World + Ollama VLM** 기반 2단계 Zero-shot 인지 파이프라인을 별도로 구현·튜닝했습니다. 텍스트 프롬프트 기반으로 객체 후보를 탐지하고 VLM으로 철갑상어와 비대상 객체를 재검증하는 확장 구조를 실험했으며, Isaac Sim과 동시 구동 시 연산 부담을 고려해 최종 시연에는 적용하지 않고 후속 Challenge로 남겼습니다.
-- 대안 perception 구조로 **SAM2 기반 Zero-shot Segmentation**과 **DINOv2 기반 visual feature extraction** 모듈도 구현·검토했으며, 최종 시연에서는 YOLO OBB와 활동량 기반 상태 판별 구조를 사용했습니다.
+- 추가 Vision 확장 실험으로 **SAM2 기반 자동 객체 분할**과 **DINOv2 기반 시각 특징 추출** 모듈을 프로토타입으로 구현·검토했으며, 최종 시연에서는 YOLO OBB와 활동량 기반 상태 판별 구조를 사용했습니다.
 
 **Technical Deep Dive:** [Notion](https://capable-moss-bbd.notion.site/Technical-Deep-Dive-3-3e046f508ab380d09f57e695e7e88f79?pvs=74)
 
