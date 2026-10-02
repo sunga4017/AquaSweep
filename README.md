@@ -21,13 +21,13 @@ Isaac Sim이 물리·수중 환경·카메라를 시뮬레이션하고, ROS 2가
 
 - Isaac Sim의 PhysX GPU Particle System을 활용해 수조 이물질 생성 및 물리 시뮬레이션 초기 구조를 구현하고, GPU Dynamics·충돌 Offset 조정을 통해 바닥 관통 등 물리 불안정 문제를 개선했습니다.
 - Top-view Camera 기반 비전 파이프라인을 개발하고, Isaac Sim Replicator 기반 synthetic dataset을 활용해 YOLO OBB 모델을 재학습하여 신규 가중치를 최종 perception pipeline에 적용했습니다.
-- 물고기의 프레임 간 중심점 이동 거리를 누적하는 `ActivityFishStatusClassifier`를 구현하여, 활동량을 기준으로 철갑상어의 정상·의심 상태를 판별하는 로직을 개발했습니다.
+- YOLO OBB 검출 결과에 centroid matching 기반 개체 추적을 결합하고, 프레임 간 중심점 이동 거리를 누적하는 `ActivityFishStatusClassifier`를 구현해 철갑상어의 정상·의심 상태를 판별했습니다. YOLO의 built-in tracking도 실험했지만, 물고기 겹침·검출 누락 상황에서는 이 프로젝트의 Activity 계산 목적에 centroid 기반 추적이 더 안정적이어서 최종 구조로 채택했습니다.
 - Top Camera의 검출 결과와 수조 상태를 기존 ROS 2 인터페이스(`/pool_N/status`, `/pool_N/top_img_det`)에 맞춰 연동하여 대시보드에서 비전 결과를 모니터링할 수 있도록 구현했습니다.
 
 ### 추가 Vision 실험
 
 - 고정 학습 클래스에 대한 의존도를 낮추기 위해 **YOLO-World + Ollama VLM** 기반 2단계 Zero-shot 인지 파이프라인을 별도로 구현·튜닝했습니다. 텍스트 프롬프트 기반으로 객체 후보를 탐지하고 VLM으로 철갑상어와 비대상 객체를 재검증하는 확장 구조를 실험했으며, Isaac Sim과 동시 구동 시 연산 부담을 고려해 최종 시연에는 적용하지 않고 후속 Challenge로 남겼습니다.
-- 대안 Vision 접근으로 **SAM2 기반 자동 객체 분할**과 **DINOv2 기반 시각 특징 추출** 구조를 실제 구현하고 성능을 검증했습니다. 다만 수중 환경의 조명 반사와 영상 특성으로 원하는 수준의 안정적인 판별 성능을 확보하기 어려워 최종 시연에서는 제외하고, **YOLO OBB + 활동량 기반 상태 판별** 구조를 채택했습니다.
+- 대안 Vision 접근으로 **SAM2 기반 자동 객체 분할**과 **DINOv2 기반 시각 특징 추출** 구조를 실제 구현하고 성능을 검증했습니다. 다만 수중 환경의 조명 반사와 영상 특성으로 안정적인 판별 성능을 확보하기 어려워 최종 시연에서는 제외하고, **YOLO OBB + 활동량 기반 상태 판별** 구조를 채택했습니다.
 
 **Technical Deep Dive:** [Notion](https://capable-moss-bbd.notion.site/Technical-Deep-Dive-3-3e046f508ab380d09f57e695e7e88f79?pvs=74)
 
